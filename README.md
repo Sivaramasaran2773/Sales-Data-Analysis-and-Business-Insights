@@ -1,5 +1,8 @@
 # Sales-Data-Analysis-and-Business-Insights
 
+## Methodology:
+![image](https://github.com/Sivaramasaran2773/Sales-Data-Analysis-and-Business-Insights/assets/96780921/adb6d7d7-683d-40a7-9e02-59559d0a4606)
+
 ## Dataset:
 OrdersandShipments.csv file: Contains the raw data used for analysis in the project.
 Project Overview

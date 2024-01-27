@@ -1,15 +1,15 @@
 # Sales-Data-Analysis-and-Business-Insights
 
-## Methodology:
+## Methodology:-
 ![image](https://github.com/Sivaramasaran2773/Sales-Data-Analysis-and-Business-Insights/assets/96780921/adb6d7d7-683d-40a7-9e02-59559d0a4606)
 
-## Dataset:
+## Dataset:-
 OrdersandShipments.csv file: Contains the raw data used for analysis in the project.
 Project Overview
 
 This project aims to analyze data from MySQL databases using Apache Spark for deriving actionable insights. The project report and presentation offer a detailed analysis of market trends, customer behavior, product performance, and operational efficiencies.
 
-## Setup and Execution
+## Setup and Execution:-
 ### MySQL Setup:
 
 Ensure MySQL Server is installed and running.

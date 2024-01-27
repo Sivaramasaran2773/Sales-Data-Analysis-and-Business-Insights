@@ -1,7 +1,7 @@
 # Sales-Data-Analysis-and-Business-Insights
 
 ## Dataset:
-OrdersandShipments.csv or other dataset files: Contains the raw data used for analysis in the project.
+OrdersandShipments.csv file: Contains the raw data used for analysis in the project.
 Project Overview
 
 This project aims to analyze data from MySQL databases using Apache Spark for deriving actionable insights. The project report and presentation offer a detailed analysis of market trends, customer behavior, product performance, and operational efficiencies.

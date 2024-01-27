@@ -1,0 +1,99 @@
+// Mysql
+
+CREATE DATABASE PROJECTF;
+USE PROJECTF;
+
+CREATE TABLE OrdersandShipments (
+    OrderID INT,
+    OrderItemID INT,
+    OrderYear INT,
+    OrderYearMonth
+    OrderMonth INT,
+    OrderDay INT,
+    OrderTime TIME,
+    OrderQuantity INT,
+    ProductDepartment VARCHAR(255),
+    ProductCategory VARCHAR(255),
+    ProductName VARCHAR(255),
+    ProductID VARCHAR(100),
+    CustomerID INT,
+    CustomerAccountID VARCHAR(100),
+    CustomerMarket VARCHAR(255),
+    CustomerRegion VARCHAR(255),
+    CustomerCountry VARCHAR(255),
+    WarehouseCountry VARCHAR(255),
+    ShipmentYear INT,
+    ShipmentMonth INT,
+    ShipmentDay INT,
+    ShipmentMode VARCHAR(255),
+    ShipmentDaysScheduled INT,
+    GrossSales DECIMAL(10,2),
+    Discount DECIMAL(5,2),
+    Profit DECIMAL(10,2)
+);
+LOAD DATA LOCAL INFILE 'C:/Users/aks19/OneDrive/sem5/DBMS/project/OrdersandShipments.csv'
+INTO TABLE OrdersandShipments
+FIELDS TERMINATED BY ',' ENCLOSED BY '"'
+LINES TERMINATED BY '\n'
+IGNORE 1 LINES;
+SELECT * FROM OrdersandShipments LIMIT 5;
+
+
+-- Table: Products
+CREATE TABLE Products (
+    ProductID VARCHAR(255) PRIMARY KEY,
+    ProductDepartment VARCHAR(255),
+    ProductCategory VARCHAR(255),
+    ProductName VARCHAR(255)
+);
+
+-- Table: Customers
+CREATE TABLE Customers (
+    CustomerAccountID VARCHAR(255) PRIMARY KEY,
+    CustomerID VARCHAR(50),
+    CustomerMarket VARCHAR(255),
+    CustomerRegion VARCHAR(255),
+    CustomerCountry VARCHAR(255),
+    WarehouseCountry VARCHAR(255)
+);
+
+--OrdersShipments Table 
+CREATE TABLE OrdersShipments (
+    OrderID INT,
+    OrderItemID INT PRIMARY KEY ,
+    OrderDay INT,
+    OrderMonth INT,
+    OrderYear INT,
+    OrderTime TIME,
+    OrderQuantity INT,
+    ProductID VARCHAR(255),
+    CustomerAccountID VARCHAR(255),
+    ShipmentYear INT,
+    ShipmentMonth INT,
+    ShipmentDay INT,
+    ShipmentMode VARCHAR(255),
+    ShipmentDaysScheduled INT,
+    GrossSales DECIMAL(10,2),
+    Discount DECIMAL(5,2),
+    Profit DECIMAL(10,2),
+    FOREIGN KEY (ProductID) REFERENCES Products(ProductID),
+    FOREIGN KEY (CustomerAccountID) REFERENCES Customers(CustomerAccountID)
+);
+
+INSERT INTO Products (ProductID, ProductDepartment, ProductCategory, ProductName)
+SELECT ProductID, ProductDepartment, ProductCategory, ProductName
+FROM OrdersandShipments;
+SELECT * FROM products LIMIT 5;
+
+
+INSERT INTO Customers (CustomerAccountID, CustomerID, CustomerMarket, CustomerRegion, CustomerCountry, WarehouseCountry)
+SELECT CustomerAccountID, CustomerID, CustomerMarket, CustomerRegion, CustomerCountry, WarehouseCountry
+FROM OrdersandShipments
+WHERE CustomerAccountID IS NOT NULL; 
+SELECT * FROM customers LIMIT 5;
+
+
+INSERT INTO OrdersShipments (OrderID, OrderItemID, OrderDay, OrderMonth, OrderYear, OrderTime, OrderQuantity, ProductID, CustomerAccountID, ShipmentYear, ShipmentMonth, ShipmentDay, ShipmentMode, ShipmentDaysScheduled, GrossSales, Discount, Profit)
+SELECT OrderID, OrderItemID, OrderDay, OrderMonth, OrderYear, OrderTime, OrderQuantity, ProductID, CustomerAccountID, ShipmentYear, ShipmentMonth, ShipmentDay, ShipmentMode, ShipmentDaysScheduled, GrossSales, Discount, Profit
+FROM OrdersandShipments;
+SELECT * FROM OrdersShipments LIMIT 5;

@@ -1,0 +1,165 @@
+
+// Spark 
+import org.apache.spark.sql.SparkSession
+val spark = SparkSession.builder() .master("local[*]").appName("SparkByExamples.com").getOrCreate()
+
+val Products = spark.read.format("jdbc").option("url", "jdbc:mysql://localhost/PROJECTF").option("driver", "com.mysql.cj.jdbc.Driver").option("dbtable", "Products").option("user", "root") .option("password", "Akshayaa_19").load()
+
+val Customers = spark.read.format("jdbc").option("url", "jdbc:mysql://localhost/PROJECTF").option("driver", "com.mysql.cj.jdbc.Driver").option("dbtable", "Customers").option("user", "root") .option("password", "Akshayaa_19").load()
+
+val OrdersandShipments = spark.read.format("jdbc").option("url", "jdbc:mysql://localhost/PROJECTF").option("driver", "com.mysql.cj.jdbc.Driver").option("dbtable", "OrdersShipments").option("user", "root") .option("password", "Akshayaa_19").load()
+
+val ordersWithDate = OrdersandShipments.withColumn("OD", date_format(concat_ws("-", col("OrderYear"), col("OrderMonth"), col("OrderDay")), "yyyy/MM/dd"))
+
+val shipmentsWithDate = ordersWithDate.withColumn("SD", date_format(concat_ws("-", col("ShipmentYear"), col("ShipmentMonth"), col("ShipmentDay")), "yyyy/MM/dd"))
+
+val cleanShipments = shipmentsWithDate.na.drop(Seq("OD", "SD"))
+val shipmentsWithDate = cleanShipments
+
+
+val OrdersandShipments = cleanShipments.withColumn("OrderDate", to_date(col("OD"), "yyyy/MM/dd")).withColumn("ShipmentDate", to_date(col("SD"), "yyyy/MM/dd"))
+
+ 
+val OrderandShipment = OrdersandShipments.drop("OrderYear", "OrderMonth", "OrderDay", "ShipmentYear", "ShipmentMonth", "ShipmentDay","OD","SD")
+
+val jdbcUrl = "jdbc:mysql://localhost/PROJECTF"
+val connectionProperties = new java.util.Properties()
+connectionProperties.put("user", "root")
+connectionProperties.put("password", "Akshayaa_19")
+connectionProperties.put("driver", "com.mysql.cj.jdbc.Driver")
+
+
+val OrderandShipment = spark.read.format("jdbc").option("url", "jdbc:mysql://localhost/PROJECTF").option("driver", "com.mysql.cj.jdbc.Driver").option("dbtable", "processedfinal").option("user", "root") .option("password", "Akshayaa_19").load()
+
+
+1)Customer churn identification by region
+
+import org.apache.spark.sql.functions._
+val joinedData = OrderandShipment.join(Customers, Seq("CustomerAccountID"))
+val uniqueCustomersByRegionYear = joinedData.groupBy("CustomerRegion").agg(
+    countDistinct(when(year(col("OrderDate")) === 2021, col("CustomerID"))).alias("UniqueCustomers_2021"),
+    countDistinct(when(year(col("OrderDate")) === 2022, col("CustomerID"))).alias("UniqueCustomers_2022")
+  ).withColumn("Difference", col("UniqueCustomers_2022") - col("UniqueCustomers_2021")).orderBy(("Difference"))
+
+uniqueCustomersByRegionYear.write.mode("overwrite").jdbc(jdbcUrl, "uniquecustomersByRegionYear", connectionProperties)
+
+
+2)Customer Purchase Behavior Analysis
+
+import org.apache.spark.sql.expressions.Window
+
+val joinedData = OrderandShipment.join(Customers, Seq("CustomerAccountID"))
+val windowSpec = Window.partitionBy("CustomerAccountID").orderBy("OrderDate")
+
+val ordersWithTimeGap = joinedData.withColumn("NextPurchaseDate", lead(col("OrderDate"), 1).over(windowSpec)).withColumn("TimeGapDays", datediff(col("NextPurchaseDate"), col("OrderDate"))).filter(col("TimeGapDays") =!= 0).select("CustomerAccountID", "OrderDate", "NextPurchaseDate", "TimeGapDays").orderBy("CustomerAccountID")
+
+ordersWithTimeGap.write.mode("overwrite").jdbc(jdbcUrl, "ordersWithTimeGap", connectionProperties)
+
+
+3)Peak Hours of Order Placements Analysis
+val ordersWithHourInTimeZone = OrderandShipment.withColumn("HourInCurrentTZ", hour(col("OrderTime")))
+
+val peakHours = ordersWithHourInTimeZone.groupBy("HourInCurrentTZ").agg(count("OrderQuantity").alias("count")).orderBy(col("count").desc)
+
+ peakHours.write.mode("overwrite").jdbc(jdbcUrl, " peakHours", connectionProperties)
+
+
+
+4)Profit Analysis by Year and Product Category
+
+val joinedData = OrderandShipment.join(Products, Seq("ProductID"))
+
+val profitByYearAndCategory = joinedData  .withColumn("Year", year(col("OrderDate")))  .groupBy("Year", "ProductCategory").agg(sum("Profit").alias("TotalProfit")) .orderBy("Year", "ProductCategory")
+
+val categorizedProfitsByYearAndCategory = profitByYearAndCategory.withColumn("ProfitCategory",when(col("TotalProfit") >= 5000, "High Profit").when(col("TotalProfit") >= 2000 && col("TotalProfit") < 5000, "Medium Profit").when(col("TotalProfit") >= 1000 && col("TotalProfit") < 2000, "Low Profit").otherwise("Very Low Profit")  )
+
+categorizedProfitsByYearAndCategory.write.mode("overwrite").jdbc(jdbcUrl, "categorizedProfitsByYearAndCategory", connectionProperties)
+
+
+
+5)Highest Selling Category by Month and Year
+
+import org.apache.spark.sql.expressions.Window
+val joinedData = OrderandShipment.join(Products, Seq("ProductID"))
+
+val highestCategoryByMonth = joinedData.withColumn("Year", year(col("OrderDate"))).withColumn("Month", month(col("OrderDate"))).groupBy("Year", "Month", "ProductCategory").agg(sum("OrderQuantity").alias("TotalQuantity"))
+
+val windowSpec = Window.partitionBy("Year", "Month").orderBy(desc("TotalQuantity"))
+
+val rankedCategories = highestCategoryByMonth.withColumn("rank", row_number().over(windowSpec)).where(col("rank") === 1).drop("rank")
+
+rankedCategories.write.mode("overwrite").jdbc(jdbcUrl, "rankedCategories", connectionProperties)
+
+
+
+6)Market Analysis: Total Sales and Profit by Customer Market
+
+val joinedData = OrderandShipment.join(Customers, Seq("CustomerAccountID"))
+val marketAnalysis = joinedData.groupBy("CustomerMarket").agg(sum("GrossSales").alias("TotalSales"),sum("Profit").alias("TotalProfit"))
+
+marketAnalysis.write.mode("overwrite").jdbc(jdbcUrl, "marketAnalysis", connectionProperties)
+
+
+
+
+7)Top Shipping Country Analysis by Day of the Week
+val joinedData = OrderandShipment.join(Customers, Seq("CustomerAccountID"))
+
+val ordersWithDayOfWeek = joinedData.withColumn("OrderDayOfWeek", dayofweek(col("OrderDate")))
+
+
+val Popwarehouse = ordersWithDayOfWeek.groupBy("OrderDayOfWeek", "CustomerCountry").agg(count("OrderID").alias("ShipmentCount")).orderBy(col("OrderDayOfWeek"), col("ShipmentCount").desc)
+
+val topshippingcountryByDayOfWeek = Popwarehouse.groupBy("OrderDayOfWeek").agg(
+   first("CustomerCountry").alias(TopShippingCountry"),
+    max("ShipmentCount").alias("MaxShipments")).orderBy("OrderDayOfWeek")
+
+topshippingcountryByDayOfWeek.write.mode("overwrite").jdbc(jdbcUrl, "topshippingcountryByDayOfWeek", connectionProperties)
+
+
+
+8)Top Country by Hourly Average Profit
+
+val ordersWithHourAndCountry = joinedData.withColumn("OrderHour", hour(col("OrderTime")))
+val avgProfitByHour = ordersWithHourAndCountry.groupBy("OrderHour", "CustomerCountry").agg(avg("Profit").alias("AvgProfit"))
+
+val windowSpec = Window.partitionBy("OrderHour").orderBy(desc("AvgProfit"))
+
+val topCountryByHour = avgProfitByHour.withColumn("rank", row_number().over(windowSpec)).filter(col("rank") === 1).drop("rank").orderBy("OrderHour")
+
+topCountryByHour.write.mode("overwrite").jdbc(jdbcUrl, "topCountryByHour", connectionProperties)
+
+
+
+9)Product Categorization and Item Count
+
+import org.apache.spark.sql.functions._
+val joinedData = OrderandShipment.join(Products, Seq("ProductID"))
+
+val labeledProducts = joinedData.withColumn("Label", when(col("ProductName").contains("Men"), "Men").when(col("ProductName").contains("Women"), "Women").when(col("ProductName").contains("Girl"),"Girl").when(col("ProductName").contains("Boy"), "Boy").otherwise("Unspecified"))
+
+val itemCountPerLabel = labeledProducts.groupBy("Label").agg(count("*").alias("ItemCountPerLabel"))
+
+itemCountPerLabel.write.mode("overwrite").jdbc(jdbcUrl, "itemCountPerLabel", connectionProperties)
+
+
+
+10)Profit Analysis on Christmas Day (Day 359)
+
+val joinedData = OrderandShipment.join(Products, Seq("ProductID"))
+
+val christmasProfit = joinedData.withColumn("YearOfOrder", year(col("OrderDate"))).withColumn("DayOfYear", dayofyear(col("OrderDate"))).filter(col("DayOfYear") === 359) 
+
+val profitByProductDuringChristmas = christmasProfit.groupBy("ProductID", "ProductName","YearOfOrder").agg(sum("Profit").alias("TotalProfitDuringChristmas")).orderBy(desc("YearofOrder"),desc("TotalProfitDuringChristmas"))
+
+profitByProductDuringChristmas.write.mode("overwrite").jdbc(jdbcUrl, "profitByProductDuringChristmas", connectionProperties)
+
+
+
+
+
+
+
+
+
+
